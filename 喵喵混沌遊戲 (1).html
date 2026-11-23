@@ -1,0 +1,707 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>喵喵混沌遊戲</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600&family=Zen+Maru+Gothic:wght@500;700&display=swap">
+<style>
+/* Layout: rounded stage card on the left (colors follow the random palette), cream control card on the right; stacks on phones. */
+:root {
+  --cream: #fff6f1;
+  --card: #fffdfb;
+  --ink: #5a3d4b;
+  --ink-soft: #8d6f7d;
+  --line: #f3dcd6;
+  --pink: #ff8fb1;
+  --pink-deep: #e0507c;
+  --butter: #fff0bd;
+  --mint: #bff0e0;
+  --sa: hsl(260, 50%, 24%);
+  --sb: hsl(260, 55%, 9%);
+  --font-body: "Zen Maru Gothic", "PingFang TC", "Microsoft JhengHei", "Noto Sans TC", "Hiragino Maru Gothic ProN", sans-serif;
+  --font-num: "Fredoka", "Zen Maru Gothic", "PingFang TC", "Microsoft JhengHei", sans-serif;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--cream);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.55;
+  padding-block: 16px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.app {
+  height: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 16px;
+}
+.stage {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  border-radius: 28px;
+  overflow: hidden;
+  background: radial-gradient(circle at 50% 42%, var(--sa), var(--sb) 85%);
+  box-shadow: 0 6px 0 rgba(90, 61, 75, .12), 0 18px 40px rgba(90, 61, 75, .18);
+  transition: background .6s ease;
+}
+.stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+#ov { touch-action: none; cursor: crosshair; }
+.chip {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(20, 10, 25, .45);
+  color: #fff;
+  font-size: 13px;
+  pointer-events: none;
+  backdrop-filter: blur(4px);
+}
+.chip svg { width: 16px; height: 16px; }
+.chip.count { left: 14px; bottom: 14px; font-family: var(--font-num); font-variant-numeric: tabular-nums; }
+.chip.tip { left: 14px; top: 14px; max-width: calc(100% - 28px); }
+
+.panel {
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  background: var(--card);
+  border: 2px solid var(--line);
+  border-radius: 28px;
+  padding: 18px 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.brand { display: flex; align-items: center; gap: 12px; }
+.brand svg { width: 52px; height: 52px; flex: none; }
+h1 { margin: 0; font-size: 22px; line-height: 1.2; letter-spacing: .02em; text-wrap: balance; }
+.sub { margin: 2px 0 0; color: var(--ink-soft); font-size: 13px; }
+
+.row { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn {
+  font: inherit;
+  font-weight: 700;
+  color: var(--ink);
+  background: #fff;
+  border: 2px solid var(--line);
+  border-bottom-width: 4px;
+  border-radius: 999px;
+  padding: 7px 16px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.btn:active { transform: translateY(2px); border-bottom-width: 2px; margin-bottom: 2px; }
+.btn.primary { background: var(--pink); border-color: var(--pink-deep); color: #fff; }
+.btn.small { padding: 3px 12px; font-size: 13px; }
+.btn svg { width: 16px; height: 16px; }
+:focus-visible { outline: 3px solid #7a5af8; outline-offset: 2px; }
+
+.field { display: flex; flex-direction: column; gap: 2px; }
+.label { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-weight: 700; }
+.label output { font-family: var(--font-num); font-variant-numeric: tabular-nums; color: var(--pink-deep); font-weight: 600; }
+.label .tools { display: flex; align-items: center; gap: 8px; }
+
+input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 24px; background: transparent; margin: 0; }
+input[type=range]::-webkit-slider-runnable-track { height: 8px; border-radius: 8px; background: var(--line); }
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 22px; height: 22px; border-radius: 50%;
+  background: var(--pink); border: 3px solid #fff; margin-top: -7px;
+  box-shadow: 0 2px 6px rgba(160, 70, 100, .4);
+}
+input[type=range]::-moz-range-track { height: 8px; border-radius: 8px; background: var(--line); }
+input[type=range]::-moz-range-thumb {
+  width: 16px; height: 16px; border-radius: 50%;
+  background: var(--pink); border: 3px solid #fff; box-shadow: 0 2px 6px rgba(160, 70, 100, .4);
+}
+
+.seg { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; background: var(--cream); padding: 4px; border-radius: 999px; border: 2px solid var(--line); }
+.seg button {
+  font: inherit; font-weight: 700; color: var(--ink-soft); background: transparent; border: 0;
+  border-radius: 999px; padding: 6px 10px; cursor: pointer; display: inline-flex; justify-content: center; align-items: center; gap: 6px;
+}
+.seg button[aria-pressed="true"] { background: var(--pink); color: #fff; }
+.seg svg { width: 16px; height: 16px; }
+
+.switch { display: flex; align-items: flex-start; gap: 12px; cursor: pointer; }
+.switch input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.switch .track {
+  flex: none; width: 46px; height: 28px; border-radius: 999px; background: var(--line);
+  position: relative; transition: background .2s; margin-top: 1px;
+}
+.switch .track::after {
+  content: ""; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%;
+  background: #fff; box-shadow: 0 1px 4px rgba(90, 61, 75, .3); transition: transform .2s;
+}
+.switch input:checked + .track { background: var(--pink); }
+.switch input:checked + .track::after { transform: translateX(18px); }
+.switch input:focus-visible + .track { outline: 3px solid #7a5af8; outline-offset: 2px; }
+.switch .txt { display: flex; flex-direction: column; min-width: 0; }
+.switch .txt b { font-weight: 700; }
+.switch .txt small { color: var(--ink-soft); font-size: 12.5px; }
+
+.swatches { display: flex; flex-wrap: wrap; gap: 8px; }
+.swatches input[type=color] {
+  width: 34px; height: 34px; padding: 0; border: 3px solid #fff; border-radius: 50%;
+  background: none; cursor: pointer; box-shadow: 0 0 0 2px var(--line);
+}
+.swatches input[type=color]::-webkit-color-swatch-wrapper { padding: 0; }
+.swatches input[type=color]::-webkit-color-swatch { border: 0; border-radius: 50%; }
+.swatches input[type=color]::-moz-color-swatch { border: 0; border-radius: 50%; }
+
+.hint { background: var(--butter); border-radius: 20px; padding: 12px 14px; font-size: 13.5px; display: flex; flex-direction: column; gap: 6px; }
+.hint h2 { margin: 0; font-size: 14px; display: flex; align-items: center; gap: 6px; }
+.hint h2 svg { width: 16px; height: 16px; color: var(--pink-deep); }
+.hint p { margin: 0; }
+.hint .dim { color: var(--ink-soft); }
+
+@media (max-width: 860px) {
+  html, body { height: auto; }
+  .app { display: flex; flex-direction: column; height: auto; }
+  .stage { height: 62svh; min-height: 340px; flex: none; }
+  .panel { overflow: visible; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .stage, .switch .track, .switch .track::after { transition: none; }
+}
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-paw" viewBox="0 0 24 24">
+    <ellipse cx="12" cy="16" rx="5.6" ry="4.6" fill="currentColor"/>
+    <circle cx="4.6" cy="10.6" r="2.4" fill="currentColor"/>
+    <circle cx="9.2" cy="5.8" r="2.7" fill="currentColor"/>
+    <circle cx="14.8" cy="5.8" r="2.7" fill="currentColor"/>
+    <circle cx="19.4" cy="10.6" r="2.4" fill="currentColor"/>
+  </symbol>
+</svg>
+
+<main class="app">
+  <section class="stage" id="stage" aria-label="混沌遊戲畫布">
+    <canvas id="main"></canvas>
+    <canvas id="ov" aria-label="拖曳貓咪可改變頂點位置，點一下空白處可放新的起點"></canvas>
+    <div class="chip tip">拖曳貓咪改變形狀，點空白處放起點</div>
+    <div class="chip count"><svg><use href="#i-paw"/></svg><span>已畫 <span id="count">0</span> 點</span></div>
+  </section>
+
+  <aside class="panel">
+    <div class="brand">
+      <svg viewBox="0 0 64 64" aria-hidden="true">
+        <path d="M8 30 L12 6 L30 16 Z" fill="#ffb27a" stroke="#fff" stroke-width="2.5" stroke-linejoin="round"/>
+        <path d="M56 30 L52 6 L34 16 Z" fill="#ffb27a" stroke="#fff" stroke-width="2.5" stroke-linejoin="round"/>
+        <path d="M13 24 L14.5 12 L23 17 Z" fill="#ffc6d9"/>
+        <path d="M51 24 L49.5 12 L41 17 Z" fill="#ffc6d9"/>
+        <ellipse cx="32" cy="36" rx="25" ry="22" fill="#ffb27a" stroke="#fff" stroke-width="2.5"/>
+        <ellipse cx="22" cy="34" rx="3.4" ry="4" fill="#4a2f3c"/>
+        <ellipse cx="42" cy="34" rx="3.4" ry="4" fill="#4a2f3c"/>
+        <circle cx="23.2" cy="32.6" r="1.2" fill="#fff"/>
+        <circle cx="43.2" cy="32.6" r="1.2" fill="#fff"/>
+        <ellipse cx="14" cy="42" rx="4.5" ry="2.8" fill="#ff9db8" opacity=".6"/>
+        <ellipse cx="50" cy="42" rx="4.5" ry="2.8" fill="#ff9db8" opacity=".6"/>
+        <path d="M29 41 L35 41 L32 45 Z" fill="#ff7fa5"/>
+        <path d="M27 47 Q29.5 51 32 47 Q34.5 51 37 47" fill="none" stroke="#4a2f3c" stroke-width="1.8" stroke-linecap="round"/>
+      </svg>
+      <div>
+        <h1>喵喵混沌遊戲</h1>
+        <p class="sub">貓咪當頂點，隨機跳出碎形</p>
+      </div>
+    </div>
+
+    <div class="row">
+      <button class="btn primary" id="run" type="button"><svg><use href="#i-paw"/></svg><span id="runTxt">暫停</span></button>
+      <button class="btn" id="clear" type="button">清除重畫</button>
+      <button class="btn" id="shuffle" type="button">換色系</button>
+    </div>
+
+    <div class="field">
+      <label class="label" for="n">頂點數量 <output id="nOut" for="n">3</output></label>
+      <input id="n" type="range" min="3" max="8" step="1" value="3">
+    </div>
+
+    <div class="field">
+      <div class="label">
+        <label for="r">移動比例 r</label>
+        <span class="tools"><button class="btn small" id="rec" type="button">推薦值</button><output id="rOut" for="r">0.50</output></span>
+      </div>
+      <input id="r" type="range" min="0.1" max="0.9" step="0.01" value="0.5">
+    </div>
+
+    <div class="field">
+      <span class="label" id="shapeLbl">點的形狀</span>
+      <div class="seg" role="group" aria-labelledby="shapeLbl">
+        <button type="button" id="shDot" aria-pressed="true">圓點</button>
+        <button type="button" id="shPaw" aria-pressed="false"><svg><use href="#i-paw"/></svg>爪印</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <label class="label" for="size">點的大小 <output id="sizeOut" for="size">1</output></label>
+      <input id="size" type="range" min="1" max="12" step="0.5" value="1">
+    </div>
+
+    <div class="field">
+      <label class="label" for="speed">速度（每幀點數） <output id="speedOut" for="speed">500</output></label>
+      <input id="speed" type="range" min="0" max="100" step="1" value="82">
+    </div>
+
+    <label class="switch">
+      <input type="checkbox" id="norepeat">
+      <span class="track"></span>
+      <span class="txt"><b>不可連續選同一個頂點</b><small>開啟後圖形會變得很不一樣</small></span>
+    </label>
+
+    <div class="field">
+      <span class="label" id="swLbl">頂點顏色</span>
+      <div class="swatches" id="swatches" role="group" aria-labelledby="swLbl"></div>
+    </div>
+
+    <div class="hint" aria-live="polite">
+      <h2><svg><use href="#i-paw"/></svg>小提示</h2>
+      <div id="hint"></div>
+    </div>
+  </aside>
+</main>
+
+<script>
+(function () {
+  'use strict';
+  var TAU = Math.PI * 2;
+  var $ = function (id) { return document.getElementById(id); };
+  var stage = $('stage'), main = $('main'), ov = $('ov');
+  var mctx = main.getContext('2d'), octx = ov.getContext('2d');
+  var W = 0, H = 0, dpr = 1;
+  var CAT_R = 22;
+  var S = {
+    n: 3, r: 0.5, speedV: 82, size: 1, shape: 'dot', noRepeat: false, running: true,
+    verts: [], start: { x: 0.5, y: 0.3 }, cur: null, last: -1, count: 0, skip: 10, drag: -1
+  };
+  var pal = { h0: 0, spread: 100, dir: 1, s: 80 };
+
+  /* ---------- color helpers ---------- */
+  function hsl2rgb(h, s, l) {
+    h = ((h % 360) + 360) % 360; s /= 100; l /= 100;
+    var a = s * Math.min(l, 1 - l);
+    function f(n) {
+      var k = (n + h / 30) % 12;
+      return (l - a * Math.max(-1, Math.min(k - 3, Math.min(9 - k, 1)))) * 255;
+    }
+    return [f(0), f(8), f(4)];
+  }
+  function toHex(c) {
+    return '#' + c.map(function (v) {
+      return Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0');
+    }).join('');
+  }
+  function fromHex(h) { return [1, 3, 5].map(function (i) { return parseInt(h.slice(i, i + 2), 16); }); }
+  function hueOf(c) {
+    var r = c[0] / 255, g = c[1] / 255, b = c[2] / 255;
+    var mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+    if (!d) return 0;
+    var h;
+    if (mx === r) h = ((g - b) / d) % 6;
+    else if (mx === g) h = (b - r) / d + 2;
+    else h = (r - g) / d + 4;
+    return (h * 60 + 360) % 360;
+  }
+  function meanColor() {
+    var m = [0, 0, 0];
+    S.verts.forEach(function (v) { m[0] += v.c[0]; m[1] += v.c[1]; m[2] += v.c[2]; });
+    var n = S.verts.length || 1;
+    return [m[0] / n, m[1] / n, m[2] / n];
+  }
+
+  /* ---------- palette & layout ---------- */
+  function randomPal() {
+    pal.h0 = Math.random() * 360;
+    pal.spread = 70 + Math.random() * 80;
+    pal.dir = Math.random() < 0.5 ? 1 : -1;
+    pal.s = 70 + Math.random() * 20;
+  }
+  function applyColors() {
+    var n = S.verts.length;
+    S.verts.forEach(function (v, i) {
+      var t = n > 1 ? i / (n - 1) : 0.5;
+      var h = pal.h0 + pal.dir * pal.spread * (t - 0.5);
+      var l = 60 + 7 * Math.sin(i * 1.9 + pal.h0);
+      v.c = hsl2rgb(h, pal.s, l);
+    });
+  }
+  function layout(n) {
+    var R = Math.min(W, H) * 0.4, cx = W / 2, cy = H * 0.53;
+    S.verts = [];
+    for (var i = 0; i < n; i++) {
+      var a = -Math.PI / 2 + i * TAU / n;
+      S.verts.push({ x: (cx + R * Math.cos(a)) / W, y: (cy + R * Math.sin(a)) / H, c: [0, 0, 0] });
+    }
+    applyColors();
+  }
+  function updateBg() {
+    var h = Math.round(hueOf(meanColor()));
+    stage.style.setProperty('--sa', 'hsl(' + h + ', 50%, 24%)');
+    stage.style.setProperty('--sb', 'hsl(' + h + ', 55%, 9%)');
+  }
+  function renderSwatches() {
+    var box = $('swatches');
+    box.innerHTML = '';
+    S.verts.forEach(function (v, i) {
+      var inp = document.createElement('input');
+      inp.type = 'color';
+      inp.id = 'vc' + i;
+      inp.value = toHex(v.c);
+      inp.setAttribute('aria-label', '頂點 ' + (i + 1) + ' 的顏色');
+      inp.addEventListener('input', function () {
+        v.c = fromHex(inp.value);
+        updateBg();
+        reset();
+      });
+      box.appendChild(inp);
+    });
+  }
+
+  /* ---------- math ---------- */
+  function rec(n) {
+    var s = 1, m = Math.floor(n / 4);
+    for (var k = 1; k <= m; k++) s += Math.cos(TAU * k / n);
+    return Math.round((1 - 1 / (2 * s)) * 100) / 100;
+  }
+  function pts() { return Math.max(1, Math.round(Math.pow(10, S.speedV / 100 * 3.3))); }
+
+  function reset() {
+    mctx.setTransform(1, 0, 0, 1, 0, 0);
+    mctx.clearRect(0, 0, main.width, main.height);
+    S.cur = { x: S.start.x * W, y: S.start.y * H, c: meanColor() };
+    S.last = -1; S.count = 0; S.skip = 10;
+  }
+
+  function paw(ctx, x, y, s, rot) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(rot);
+    ctx.beginPath();
+    ctx.ellipse(0, s * 0.32, s * 0.52, s * 0.42, 0, 0, TAU);
+    var toes = [[-0.78, -0.12, 0.22], [-0.27, -0.55, 0.25], [0.27, -0.55, 0.25], [0.78, -0.12, 0.22]];
+    for (var i = 0; i < toes.length; i++) {
+      var t = toes[i];
+      ctx.moveTo(s * (t[0] + t[2]), s * t[1]);
+      ctx.arc(s * t[0], s * t[1], s * t[2], 0, TAU);
+    }
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function plot(dx, dy) {
+    var c = S.cur;
+    mctx.fillStyle = 'rgb(' + (c.c[0] | 0) + ',' + (c.c[1] | 0) + ',' + (c.c[2] | 0) + ')';
+    if (S.shape === 'paw') {
+      mctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      paw(mctx, c.x, c.y, S.size, Math.atan2(dy, dx) + Math.PI / 2);
+    } else if (S.size < 3) {
+      mctx.setTransform(1, 0, 0, 1, 0, 0);
+      var sd = Math.max(1, Math.round(S.size * dpr));
+      mctx.fillRect(Math.round(c.x * dpr - sd / 2), Math.round(c.y * dpr - sd / 2), sd, sd);
+    } else {
+      mctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      mctx.beginPath();
+      mctx.arc(c.x, c.y, S.size / 2, 0, TAU);
+      mctx.fill();
+    }
+  }
+
+  function step() {
+    var n = S.n, k;
+    if (S.noRepeat && S.last >= 0) k = (S.last + 1 + ((Math.random() * (n - 1)) | 0)) % n;
+    else k = (Math.random() * n) | 0;
+    S.last = k;
+    var v = S.verts[k], vx = v.x * W, vy = v.y * H, r = S.r, c = S.cur;
+    var dx = vx - c.x, dy = vy - c.y;
+    c.x += r * dx; c.y += r * dy;
+    c.c[0] += r * (v.c[0] - c.c[0]);
+    c.c[1] += r * (v.c[1] - c.c[1]);
+    c.c[2] += r * (v.c[2] - c.c[2]);
+    if (S.skip > 0) { S.skip--; return; }
+    S.count++;
+    plot(dx, dy);
+  }
+
+  /* ---------- overlay: cats, start marker ---------- */
+  function cat(ctx, x, y, R, col, sc) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(sc, sc);
+    var c = 'rgb(' + (col[0] | 0) + ',' + (col[1] | 0) + ',' + (col[2] | 0) + ')';
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = 2.5;
+    ctx.strokeStyle = 'rgba(255,255,255,.95)';
+    ctx.fillStyle = c;
+    ctx.shadowColor = 'rgba(0,0,0,.35)';
+    ctx.shadowBlur = 10;
+    ctx.shadowOffsetY = 3;
+    var sx, signs = [-1, 1];
+    for (var i = 0; i < 2; i++) {
+      sx = signs[i];
+      ctx.beginPath();
+      ctx.moveTo(sx * R * 0.95, -R * 0.1);
+      ctx.lineTo(sx * R * 0.78, -R * 1.15);
+      ctx.lineTo(sx * R * 0.12, -R * 0.78);
+      ctx.closePath();
+      ctx.fill(); ctx.stroke();
+    }
+    ctx.shadowColor = 'transparent';
+    ctx.fillStyle = '#ffc6d9';
+    for (i = 0; i < 2; i++) {
+      sx = signs[i];
+      ctx.beginPath();
+      ctx.moveTo(sx * R * 0.78, -R * 0.38);
+      ctx.lineTo(sx * R * 0.7, -R * 0.92);
+      ctx.lineTo(sx * R * 0.3, -R * 0.68);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.fillStyle = c;
+    ctx.shadowColor = 'rgba(0,0,0,.35)';
+    ctx.shadowBlur = 10;
+    ctx.shadowOffsetY = 3;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, R, R * 0.88, 0, 0, TAU);
+    ctx.fill(); ctx.stroke();
+    ctx.shadowColor = 'transparent';
+    // cheeks
+    ctx.fillStyle = 'rgba(255,140,170,.55)';
+    for (i = 0; i < 2; i++) {
+      ctx.beginPath();
+      ctx.ellipse(signs[i] * R * 0.62, R * 0.27, R * 0.17, R * 0.1, 0, 0, TAU);
+      ctx.fill();
+    }
+    // eyes
+    for (i = 0; i < 2; i++) {
+      ctx.fillStyle = '#4a2f3c';
+      ctx.beginPath();
+      ctx.ellipse(signs[i] * R * 0.38, -R * 0.05, R * 0.12, R * 0.15, 0, 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.arc(signs[i] * R * 0.38 + R * 0.04, -R * 0.1, R * 0.045, 0, TAU);
+      ctx.fill();
+    }
+    // nose + mouth
+    ctx.fillStyle = '#ff7fa5';
+    ctx.beginPath();
+    ctx.moveTo(-R * 0.09, R * 0.1);
+    ctx.lineTo(R * 0.09, R * 0.1);
+    ctx.lineTo(0, R * 0.2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = '#4a2f3c';
+    ctx.lineWidth = 1.5;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.arc(-R * 0.1, R * 0.26, R * 0.1, 0.1 * Math.PI, 0.95 * Math.PI);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(R * 0.1, R * 0.26, R * 0.1, 0.05 * Math.PI, 0.9 * Math.PI);
+    ctx.stroke();
+    // whiskers
+    ctx.strokeStyle = 'rgba(255,255,255,.85)';
+    ctx.lineWidth = 1.4;
+    var ds = [-0.16, 0, 0.16];
+    for (i = 0; i < 2; i++) {
+      for (var j = 0; j < 3; j++) {
+        ctx.beginPath();
+        ctx.moveTo(signs[i] * R * 0.78, R * 0.2 + ds[j] * R * 0.3);
+        ctx.lineTo(signs[i] * R * 1.3, R * 0.2 + ds[j] * R * 1.2);
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
+
+  function drawOverlay() {
+    octx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    octx.clearRect(0, 0, W, H);
+    var v = S.verts, i;
+    // guide polygon
+    octx.save();
+    octx.setLineDash([4, 7]);
+    octx.strokeStyle = 'rgba(255,255,255,.22)';
+    octx.lineWidth = 1.5;
+    octx.beginPath();
+    for (i = 0; i < v.length; i++) {
+      if (i === 0) octx.moveTo(v[i].x * W, v[i].y * H); else octx.lineTo(v[i].x * W, v[i].y * H);
+    }
+    octx.closePath();
+    octx.stroke();
+    octx.restore();
+    // start marker
+    var sx = S.start.x * W, sy = S.start.y * H;
+    octx.save();
+    octx.strokeStyle = 'rgba(255,255,255,.9)';
+    octx.fillStyle = 'rgba(255,255,255,.22)';
+    octx.lineWidth = 2;
+    octx.beginPath(); octx.arc(sx, sy, 8, 0, TAU); octx.fill(); octx.stroke();
+    octx.fillStyle = '#fff';
+    octx.beginPath(); octx.arc(sx, sy, 2.5, 0, TAU); octx.fill();
+    octx.font = '700 12px "Zen Maru Gothic", "PingFang TC", "Microsoft JhengHei", sans-serif';
+    octx.textAlign = 'center';
+    octx.lineWidth = 3;
+    octx.strokeStyle = 'rgba(0,0,0,.45)';
+    octx.strokeText('起點', sx, sy - 14);
+    octx.fillStyle = '#fff';
+    octx.fillText('起點', sx, sy - 14);
+    octx.restore();
+    // cats
+    var slow = pts() <= 30;
+    for (i = 0; i < v.length; i++) {
+      var sc = 1;
+      if (S.drag === i) sc = 1.18;
+      else if (slow && S.running && S.last === i) sc = 1.15;
+      cat(octx, v[i].x * W, v[i].y * H, CAT_R, v[i].c, sc);
+    }
+  }
+
+  /* ---------- hint / UI sync ---------- */
+  function updateHint() {
+    var n = S.n, rr = rec(n), r2 = rr.toFixed(2), t;
+    if (n === 3) t = '三角形 r = 0.50 會出現謝爾賓斯基三角形。';
+    else if (n === 4) t = '正方形 r = 0.50 會把整個方形填滿，看不出碎形。開啟「不可連續選同一個頂點」，或把 r 調到 0.60～0.70，就會出現圖案。';
+    else if (n === 5) t = '五邊形 r ≈ ' + r2 + '（黃金比例）會出現謝爾賓斯基五邊形。';
+    else if (n === 6) t = '六邊形 r ≈ ' + r2 + ' 會出現雪花狀的碎形。';
+    else t = n + ' 邊形 r ≈ ' + r2 + ' 時，各個小圖形剛好相接，碎形最清楚。';
+    var html = '<p>' + t + '</p>';
+    if (S.r < rr - 0.02) html += '<p>目前 r 比推薦值小，小圖形會互相重疊，畫面容易糊成一片。</p>';
+    else if (S.r > rr + 0.02) html += '<p>目前 r 比推薦值大，小圖形之間會留出空隙。</p>';
+    if (S.noRepeat) html += '<p>已開啟「不可連續選同一個頂點」，試著再改變 r 和頂點數量。</p>';
+    if (S.shape === 'paw') html += '<p>爪印模式：每個點是一隻小腳印，朝向被選中的頂點。已自動調整大小和速度。</p>';
+    html += '<p class="dim">前 10 個點不畫，因為它們還沒落到圖形上。起點放在多邊形外面也可以。</p>';
+    $('hint').innerHTML = html;
+  }
+  function syncUI() {
+    $('n').value = S.n; $('nOut').textContent = S.n;
+    $('r').value = S.r; $('rOut').textContent = S.r.toFixed(2);
+    $('size').value = S.size; $('sizeOut').textContent = S.size;
+    $('speed').value = S.speedV; $('speedOut').textContent = pts().toLocaleString('en-US');
+    $('shDot').setAttribute('aria-pressed', S.shape === 'dot');
+    $('shPaw').setAttribute('aria-pressed', S.shape === 'paw');
+    $('runTxt').textContent = S.running ? '暫停' : '開始';
+    $('norepeat').checked = S.noRepeat;
+  }
+
+  /* ---------- controls ---------- */
+  $('n').addEventListener('input', function (e) {
+    S.n = +e.target.value;
+    layout(S.n);
+    S.r = rec(S.n);
+    renderSwatches(); updateBg(); syncUI(); updateHint(); reset();
+  });
+  $('r').addEventListener('input', function (e) {
+    S.r = +e.target.value; syncUI(); updateHint(); reset();
+  });
+  $('rec').addEventListener('click', function () {
+    S.r = rec(S.n); syncUI(); updateHint(); reset();
+  });
+  $('size').addEventListener('input', function (e) { S.size = +e.target.value; syncUI(); });
+  $('speed').addEventListener('input', function (e) { S.speedV = +e.target.value; syncUI(); });
+  $('norepeat').addEventListener('change', function (e) { S.noRepeat = e.target.checked; updateHint(); reset(); });
+  function setShape(sh) {
+    if (S.shape === sh) return;
+    S.shape = sh;
+    if (sh === 'paw') { S.size = 8; S.speedV = 21; } else { S.size = 1; S.speedV = 82; }
+    syncUI(); updateHint(); reset();
+  }
+  $('shDot').addEventListener('click', function () { setShape('dot'); });
+  $('shPaw').addEventListener('click', function () { setShape('paw'); });
+  $('run').addEventListener('click', function () { S.running = !S.running; syncUI(); });
+  $('clear').addEventListener('click', function () { reset(); });
+  $('shuffle').addEventListener('click', function () {
+    randomPal(); applyColors(); renderSwatches(); updateBg(); reset();
+  });
+
+  /* ---------- pointer: drag cats, click to place start ---------- */
+  function posOf(e) {
+    var rect = ov.getBoundingClientRect();
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  }
+  function hit(p) {
+    for (var i = S.verts.length - 1; i >= 0; i--) {
+      var v = S.verts[i];
+      if (Math.hypot(p.x - v.x * W, p.y - v.y * H) <= CAT_R + 10) return i;
+    }
+    return -1;
+  }
+  ov.addEventListener('pointerdown', function (e) {
+    var p = posOf(e), i = hit(p);
+    if (i >= 0) {
+      S.drag = i;
+      try { ov.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+      ov.style.cursor = 'grabbing';
+    } else {
+      S.start = { x: Math.min(Math.max(p.x / W, 0), 1), y: Math.min(Math.max(p.y / H, 0), 1) };
+      reset();
+    }
+  });
+  ov.addEventListener('pointermove', function (e) {
+    var p = posOf(e);
+    if (S.drag >= 0) {
+      var v = S.verts[S.drag];
+      var x = Math.min(Math.max(p.x, CAT_R + 4), W - CAT_R - 4);
+      var y = Math.min(Math.max(p.y, CAT_R * 1.3 + 4), H - CAT_R - 4);
+      v.x = x / W; v.y = y / H;
+      reset();
+    } else {
+      ov.style.cursor = hit(p) >= 0 ? 'grab' : 'crosshair';
+    }
+  });
+  function endDrag() { S.drag = -1; ov.style.cursor = 'crosshair'; }
+  ov.addEventListener('pointerup', endDrag);
+  ov.addEventListener('pointercancel', endDrag);
+
+  /* ---------- main loop ---------- */
+  var lastCountText = '', frameNo = 0;
+  function frame() {
+    if (S.running && S.cur) {
+      var m = pts();
+      for (var i = 0; i < m; i++) step();
+    }
+    drawOverlay();
+    if ((frameNo++ % 4) === 0) {
+      var t = S.count.toLocaleString('en-US');
+      if (t !== lastCountText) { $('count').textContent = t; lastCountText = t; }
+    }
+    requestAnimationFrame(frame);
+  }
+
+  function init() {
+    randomPal();
+    layout(S.n);
+    S.r = rec(S.n);
+    S.start = { x: 0.3 + Math.random() * 0.4, y: 0.3 + Math.random() * 0.4 };
+    renderSwatches(); updateBg(); syncUI(); updateHint(); reset();
+    requestAnimationFrame(frame);
+  }
+
+  var ro = new ResizeObserver(function () {
+    var r = stage.getBoundingClientRect();
+    var w = Math.round(r.width), h = Math.round(r.height);
+    if (w < 10 || h < 10 || (w === W && h === H)) return;
+    var first = (W === 0);
+    W = w; H = h;
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    [main, ov].forEach(function (c) {
+      c.width = Math.round(W * dpr);
+      c.height = Math.round(H * dpr);
+    });
+    if (first) init(); else reset();
+  });
+  ro.observe(stage);
+})();
+</script>
+
+</body></html>
