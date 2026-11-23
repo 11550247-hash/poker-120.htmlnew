@@ -1,0 +1,884 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>撲克湊數</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Bodoni+Moda:wght@600;700&display=swap">
+<style>
+/* Layout: 貓爪印邊框圍住整頁；中間依序是設定列、貓咪計分板、牌桌（牌堆＋可玩的手牌）、算法清單。 */
+:root{
+  --bg:#d6ecfb; --fg:#1d3045; --muted:#4f6a82; --line:#b4d5ee;
+  --felt:#bfe0f6; --felt-deep:#a2cfee; --felt-fg:#1d3045;
+  --accent:#c0345c; --accent-fg:#ffffff;
+  --card:#fffdfb; --card-ink:#2a2f3a; --card-red:#d23c5e; --card-edge:#e3d5d8;
+  --back-a:#f3879f; --ear-in:#ffc9d6;
+  --input-bg:#f2f9fe; --panel:rgba(255,255,255,.62); --fish:#ff9a5c;
+  --edge:clamp(22px,4vw,34px);
+  --font-body:"Noto Sans TC",system-ui,-apple-system,"PingFang TC","Microsoft JhengHei",sans-serif;
+  --font-card:"Bodoni Moda","Didot",Georgia,serif;
+  --paw:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='36' height='36' viewBox='0 0 36 36'%3E%3Cg fill='white' fill-opacity='.6'%3E%3Cg transform='translate(2 2) scale(.75)'%3E%3Cellipse cx='14' cy='17.5' rx='4.6' ry='3.8'/%3E%3Ccircle cx='8.6' cy='12' r='1.9'/%3E%3Ccircle cx='12' cy='8.8' r='1.9'/%3E%3Ccircle cx='16' cy='8.8' r='1.9'/%3E%3Ccircle cx='19.4' cy='12' r='1.9'/%3E%3C/g%3E%3Cg transform='translate(20 20) scale(.75)'%3E%3Cellipse cx='14' cy='17.5' rx='4.6' ry='3.8'/%3E%3Ccircle cx='8.6' cy='12' r='1.9'/%3E%3Ccircle cx='12' cy='8.8' r='1.9'/%3E%3Ccircle cx='16' cy='8.8' r='1.9'/%3E%3Ccircle cx='19.4' cy='12' r='1.9'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  --trail-v:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='72' viewBox='0 0 28 72'%3E%3Cg fill='%23f7a8bb' fill-opacity='.9'%3E%3Cg transform='translate(9 17) rotate(-12)'%3E%3Cellipse cx='0' cy='4' rx='5' ry='4.2'/%3E%3Ccircle cx='-6' cy='-3' r='2.2'/%3E%3Ccircle cx='-2.2' cy='-6.8' r='2.2'/%3E%3Ccircle cx='2.2' cy='-6.8' r='2.2'/%3E%3Ccircle cx='6' cy='-3' r='2.2'/%3E%3C/g%3E%3Cg transform='translate(19 53) rotate(12)'%3E%3Cellipse cx='0' cy='4' rx='5' ry='4.2'/%3E%3Ccircle cx='-6' cy='-3' r='2.2'/%3E%3Ccircle cx='-2.2' cy='-6.8' r='2.2'/%3E%3Ccircle cx='2.2' cy='-6.8' r='2.2'/%3E%3Ccircle cx='6' cy='-3' r='2.2'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  --trail-h:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='72' height='28' viewBox='0 0 72 28'%3E%3Cg fill='%23f7a8bb' fill-opacity='.9'%3E%3Cg transform='translate(17 9) rotate(78)'%3E%3Cellipse cx='0' cy='4' rx='5' ry='4.2'/%3E%3Ccircle cx='-6' cy='-3' r='2.2'/%3E%3Ccircle cx='-2.2' cy='-6.8' r='2.2'/%3E%3Ccircle cx='2.2' cy='-6.8' r='2.2'/%3E%3Ccircle cx='6' cy='-3' r='2.2'/%3E%3C/g%3E%3Cg transform='translate(53 19) rotate(102)'%3E%3Cellipse cx='0' cy='4' rx='5' ry='4.2'/%3E%3Ccircle cx='-6' cy='-3' r='2.2'/%3E%3Ccircle cx='-2.2' cy='-6.8' r='2.2'/%3E%3Ccircle cx='2.2' cy='-6.8' r='2.2'/%3E%3Ccircle cx='6' cy='-3' r='2.2'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+}
+/* 固定使用淺藍色外觀（依使用者要求），不跟隨深色模式。 */
+*{box-sizing:border-box}
+body{
+  background:var(--bg); color:var(--fg);
+  font-family:var(--font-body); font-size:16px; line-height:1.6;
+  padding-block:clamp(44px,7vw,64px);
+  padding-left:max(calc(var(--edge) + 12px),env(safe-area-inset-left,0px));
+  padding-right:max(calc(var(--edge) + 12px),env(safe-area-inset-right,0px));
+}
+button{font:inherit;cursor:pointer}
+main{position:relative;z-index:1;max-width:920px;margin-inline:auto;display:grid;gap:clamp(18px,3vw,28px)}
+h1{font-size:clamp(1.7rem,5vw,2.3rem);line-height:1.15;margin:0 0 8px;font-weight:700;letter-spacing:.02em;text-wrap:balance}
+.sub{margin:0;color:var(--muted);max-width:44em}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+
+/* 邊框：四邊貓爪印腳印，四個角落各有一隻貓 */
+.frame{
+  position:fixed;z-index:0;pointer-events:none;
+  inset:env(safe-area-inset-top,0px) 0 env(safe-area-inset-bottom,0px) 0;
+  background:
+    var(--trail-v) left top/var(--edge) auto repeat-y,
+    var(--trail-v) right top/var(--edge) auto repeat-y,
+    var(--trail-h) left top/auto var(--edge) repeat-x,
+    var(--trail-h) left bottom/auto var(--edge) repeat-x;
+}
+.cc{position:fixed;z-index:0;pointer-events:none;width:clamp(34px,6vw,52px);transform:rotate(var(--rot,0deg))}
+.cc svg{display:block;width:100%;height:auto;color:#2a2f3a}
+.cc-tl{top:calc(env(safe-area-inset-top,0px) + 2px);left:2px}
+.cc-tr{top:calc(env(safe-area-inset-top,0px) + 2px);right:2px}
+.cc-bl{bottom:calc(env(safe-area-inset-bottom,0px) + 2px);left:2px}
+.cc-br{bottom:calc(env(safe-area-inset-bottom,0px) + 2px);right:2px}
+.logo{width:1.35em;height:auto;vertical-align:-.25em;margin-right:.3em;color:#2a2f3a;--cat:#ffd9e1}
+
+.controls{display:flex;flex-wrap:wrap;gap:14px 20px;align-items:flex-end}
+.field{display:grid;gap:4px}
+.field label{font-size:.82rem;color:var(--muted);letter-spacing:.06em}
+.field input[type=number]{
+  width:5.6rem;padding:9px 10px;font:inherit;font-variant-numeric:tabular-nums;
+  color:var(--fg);background:var(--input-bg);border:1px solid var(--line);border-radius:8px;
+}
+.chk{display:flex;align-items:center;gap:8px;min-height:44px;font-size:.95rem;cursor:pointer}
+.chk input{width:20px;height:20px;accent-color:var(--accent);margin:0}
+.btns{display:flex;flex-wrap:wrap;gap:10px;flex:1 1 280px;justify-content:flex-end}
+.controls button{
+  font-weight:700;letter-spacing:.06em;padding:11px 22px;border-radius:10px;border:0;
+  flex:1 1 9rem;max-width:14rem;min-height:44px;
+}
+.controls button.primary{background:var(--accent);color:var(--accent-fg)}
+.controls button.ink{background:var(--fg);color:var(--bg)}
+button[disabled]{opacity:.5;cursor:default}
+
+/* 貓咪計分板 */
+.board{
+  display:grid;grid-template-columns:auto 1fr;gap:10px 16px;align-items:center;
+  background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:12px 16px;
+}
+.mascot{width:clamp(64px,14vw,92px);height:auto;display:block;color:#2a2f3a}
+.mascot .m{display:none}
+.mascot[data-mood="idle"] .idle,.mascot[data-mood="happy"] .happy,.mascot[data-mood="oops"] .oops{display:inline}
+.bubble{position:relative;background:#fff;border-radius:14px;padding:10px 14px;min-height:3.2em;display:flex;align-items:center}
+.bubble::before{content:"";position:absolute;left:-8px;top:50%;margin-top:-8px;border:8px solid transparent;border-left:0;border-right-color:#fff}
+.stats{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:6px 22px;margin:0;padding-top:8px;border-top:1px dashed var(--line)}
+.stat{display:flex;align-items:center;gap:8px;margin:0}
+.stat dt{font-size:.8rem;color:var(--muted);letter-spacing:.06em}
+.stat dd{margin:0;font-weight:700;font-variant-numeric:tabular-nums;display:flex;align-items:center;gap:5px}
+.fish{width:22px;height:auto;display:block}
+.lvnote{font-weight:400;font-size:.8rem;color:var(--muted)}
+
+/* 牌桌 */
+.table{
+  --cw:clamp(52px,11vw,84px);
+  position:relative;color:var(--felt-fg);border-radius:18px;
+  background:radial-gradient(120% 150% at 25% 0%,var(--felt) 0%,var(--felt-deep) 100%);
+  padding:clamp(18px,3vw,30px);
+  display:grid;grid-template-columns:auto 1fr;gap:clamp(16px,4vw,44px);align-items:center;
+}
+.peeker{position:absolute;right:clamp(24px,10%,90px);bottom:calc(100% - 4px);width:clamp(64px,12vw,92px);height:auto;pointer-events:none}
+.confetti{position:absolute;inset:0;overflow:hidden;border-radius:18px;pointer-events:none;z-index:3}
+.conf{position:absolute;top:0;width:22px;height:22px;display:block}
+.conf svg{width:100%;height:100%;display:block}
+.badge{
+  position:absolute;top:10px;left:14px;font-size:.75rem;letter-spacing:.12em;
+  padding:2px 10px;border:1px solid currentColor;border-radius:99px;opacity:.85;
+}
+.deck-wrap{display:grid;gap:14px;justify-items:center;padding:8px 8px 0 8px}
+.deck{position:relative;width:var(--cw);height:calc(var(--cw)*1.4)}
+.layer{
+  position:absolute;inset:0;
+  background:var(--paw) center/calc(var(--cw)*.36) repeat,var(--back-a);
+  border:calc(var(--cw)*.05) solid #fff;border-radius:calc(var(--cw)*.14);
+  box-shadow:0 1px 0 rgba(0,0,0,.15),0 4px 10px -4px rgba(29,48,69,.45);
+  --ear:var(--back-a);
+}
+.deck-count{font-size:.85rem;letter-spacing:.06em;font-variant-numeric:tabular-nums;opacity:.9;margin-top:6px}
+
+.stage{display:grid;gap:14px;justify-items:center;min-width:0}
+.target-tag{background:#fff;border-radius:99px;padding:2px 18px;font-weight:700;letter-spacing:.06em}
+.target-tag b{color:var(--accent);font-size:1.5rem;font-variant-numeric:tabular-nums;margin-left:4px}
+.hand{
+  width:100%;display:flex;flex-wrap:wrap;justify-content:center;align-content:center;
+  gap:14px clamp(8px,1.6vw,14px);min-height:calc(var(--cw)*1.4 + 2.2rem);
+}
+button.slot{
+  appearance:none;background:none;border:0;padding:0;color:inherit;
+  display:grid;justify-items:center;gap:8px;transition:transform .15s;-webkit-tap-highlight-color:transparent;
+}
+button.slot:hover{transform:translateY(-3px)}
+button.slot.sel{transform:translateY(-10px)}
+.slot.sel .front{box-shadow:0 0 0 3px var(--accent),0 10px 18px -6px rgba(29,48,69,.55)}
+.slot.sel .yarn svg{outline:3px solid var(--accent);outline-offset:2px;border-radius:50%}
+@keyframes glow{0%,100%{box-shadow:0 0 0 3px #f5b323,0 0 0 rgba(245,179,35,0)}50%{box-shadow:0 0 0 3px #f5b323,0 0 18px 6px rgba(245,179,35,.7)}}
+.slot.hint .front{animation:glow 1s ease-in-out infinite}
+.slot.hint .yarn svg{outline:3px solid #f5b323;outline-offset:2px;border-radius:50%}
+.val{
+  font-variant-numeric:tabular-nums;font-size:.82rem;min-width:2.2em;text-align:center;
+  padding:0 8px;border-radius:99px;background:rgba(255,255,255,.75);color:var(--felt-fg);
+}
+.val.cap{max-width:calc(var(--cw)*1.7);border-radius:10px;line-height:1.3;font-size:.72rem;padding:1px 8px;overflow-wrap:anywhere}
+
+.card{position:relative;width:var(--cw);aspect-ratio:5/7;transform-style:preserve-3d;font-size:calc(var(--cw)*.27)}
+.face{
+  position:absolute;inset:0;border-radius:calc(var(--cw)*.14);
+  backface-visibility:hidden;-webkit-backface-visibility:hidden;
+  box-shadow:0 1px 0 rgba(0,0,0,.18),0 6px 14px -6px rgba(29,48,69,.5);
+}
+.front{background:var(--card);color:var(--card-ink);border:1px solid var(--card-edge);--ear:var(--card)}
+.front.red{color:var(--card-red)}
+.back{
+  transform:rotateY(180deg);
+  background:var(--paw) center/calc(var(--cw)*.36) repeat,var(--back-a);
+  border:calc(var(--cw)*.05) solid #fff;--ear:var(--back-a);
+}
+.corner{position:absolute;display:flex;flex-direction:column;align-items:center;line-height:1;font-family:var(--font-card);font-weight:700}
+.corner i{font-style:normal;font-size:.8em;margin-top:.1em}
+.tl{top:.38em;left:.38em}
+.br{bottom:.38em;right:.38em;transform:rotate(180deg)}
+.s0{--cat:#dfe5f1}.s1{--cat:#ffd9e1}.s2{--cat:#ffe5bf}.s3{--cat:#d9f0df}
+.pip{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.12em;padding-top:.6em;line-height:1}
+.pip svg{width:64%;height:auto;display:block}
+.pip em{font-style:normal;font-size:.85em;line-height:1}
+/* 貓耳朵：每張牌的正面、背面和牌堆最上面一張都有 */
+.face::before,.face::after,.layer:last-child::before,.layer:last-child::after{
+  content:"";position:absolute;top:-9%;width:25%;height:17%;
+  background:radial-gradient(ellipse 36% 46% at 50% 82%,var(--ear-in) 0 99%,transparent 100%),var(--ear);
+  clip-path:polygon(0 100%,50% 0,100% 100%);
+}
+.face::before,.layer:last-child::before{left:9%;transform:rotate(-8deg)}
+.face::after,.layer:last-child::after{right:9%;transform:rotate(8deg)}
+
+/* 毛線球：兩張牌合起來的結果 */
+.yarn{position:relative;width:var(--cw);height:calc(var(--cw)*1.4);display:grid;place-items:center}
+.yarn svg{grid-area:1/1;width:100%;height:auto;display:block}
+.ynum{
+  grid-area:1/1;z-index:1;background:#fff;color:var(--card-ink);border-radius:99px;padding:0 .4em;
+  font-family:var(--font-card);font-weight:700;font-size:calc(var(--cw)*.3);line-height:1.3;
+  font-variant-numeric:tabular-nums;box-shadow:0 1px 4px rgba(29,48,69,.25);
+}
+.ynum.small{font-size:calc(var(--cw)*.2)}
+
+.ops{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;align-items:center}
+.op{
+  width:48px;height:48px;border-radius:50%;border:2px solid #fff;background:#fff;color:var(--fg);
+  font-weight:700;font-size:1.5rem;line-height:1;display:grid;place-items:center;padding:0;flex:none;
+}
+.op.on{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
+.sep{width:1px;height:28px;background:rgba(29,48,69,.25);margin:0 4px}
+.tool{
+  padding:8px 16px;border-radius:99px;background:rgba(255,255,255,.7);color:var(--fg);
+  border:1px solid rgba(29,48,69,.25);font-weight:500;letter-spacing:.04em;min-height:40px;
+}
+.status{margin:0;font-size:.95rem;min-height:1.6em;text-align:center;font-variant-numeric:tabular-nums}
+
+.results{display:grid;gap:6px;min-height:8rem}
+.results h2{font-size:1.1rem;margin:0;font-weight:700;display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px}
+.tag{font-size:.72rem;letter-spacing:.12em;padding:1px 9px;border:1px solid var(--line);border-radius:99px;color:var(--muted);font-weight:400}
+.hint{margin:4px 0 0;color:var(--muted)}
+.solutions{list-style:none;margin:10px 0 0;padding:0}
+.sol{display:grid;grid-template-columns:4.6rem 1fr;gap:4px 16px;padding:16px 0;border-top:1px solid var(--line)}
+.idx{color:var(--muted);font-size:.85rem;padding-top:.55em;letter-spacing:.06em}
+.expr{font-size:clamp(1.2rem,4.6vw,1.65rem);font-weight:500;font-variant-numeric:tabular-nums;overflow-wrap:anywhere;min-width:0}
+.op-s{color:var(--accent);font-weight:700}
+.steps{grid-column:2;display:flex;flex-wrap:wrap;gap:4px 8px;color:var(--muted);font-size:.9rem;font-variant-numeric:tabular-nums;min-width:0}
+.step+.step::before{content:"→";margin-right:8px;opacity:.7}
+@media (max-width:640px){
+  .table{grid-template-columns:1fr;justify-items:center}
+  .deck-wrap{grid-template-columns:auto auto;align-items:center;gap:18px;padding-bottom:0}
+  .deck-count{margin-top:0}
+  .btns{justify-content:stretch}
+  .controls button{max-width:none}
+}
+@media (max-width:520px){
+  .sol{grid-template-columns:1fr}
+  .steps{grid-column:1}
+}
+@media (prefers-reduced-motion:reduce){
+  button.slot{transition:none}
+  .slot.hint .front{animation:none}
+}
+</style>
+
+<div class="frame" aria-hidden="true"></div>
+<div id="corners" aria-hidden="true"></div>
+
+<main>
+  <header>
+    <h1><svg class="logo" viewBox="0 0 64 54" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"><path d="M11 24 L12 4 L27 13 Z" style="fill:var(--cat)"/><path d="M53 24 L52 4 L37 13 Z" style="fill:var(--cat)"/><ellipse cx="32" cy="32" rx="25" ry="19" style="fill:var(--cat)"/><circle cx="23" cy="30" r="2.6" fill="currentColor" stroke="none"/><circle cx="41" cy="30" r="2.6" fill="currentColor" stroke="none"/><ellipse cx="17" cy="37" rx="4" ry="2.4" fill="#ff9db5" opacity=".6" stroke="none"/><ellipse cx="47" cy="37" rx="4" ry="2.4" fill="#ff9db5" opacity=".6" stroke="none"/><path d="M29.8 35.5 h4.4 l-2.2 2.8 z" fill="currentColor"/><path d="M32 38.5 q-2.6 3.6 -6 1.6 M32 38.5 q2.6 3.6 6 1.6" stroke-width="2"/><path d="M13 36 l-8 -2 M13 40 l-8 3 M51 36 l8 -2 M51 40 l8 3" stroke-width="1.6"/></svg>撲克湊數</h1>
+    <p class="sub">從 52 張牌（沒有鬼牌）抽出幾張，用加、減、乘、除把每張牌各用一次，湊出目標數字。A＝1、J＝11、Q＝12、K＝13。發牌後可以直接玩：點一張牌、選運算符號、再點另一張牌，兩張牌會合成一顆毛線球。湊對就能拿小魚乾，想看答案就按「找出算法」。</p>
+  </header>
+
+  <section class="controls" aria-label="設定">
+    <div class="field"><label for="n-cards">抽牌張數</label><input id="n-cards" type="number" inputmode="numeric" min="2" max="7" value="5"></div>
+    <div class="field"><label for="target">目標數字</label><input id="target" type="number" inputmode="numeric" min="1" max="9999" value="120"></div>
+    <div class="field"><label for="want">算法組數</label><input id="want" type="number" inputmode="numeric" min="1" max="10" value="5"></div>
+    <label class="chk" for="solvable"><input id="solvable" type="checkbox" checked>保證有解</label>
+    <div class="btns">
+      <button id="deal" class="primary" type="button">發牌</button>
+      <button id="solve" class="ink" type="button">找出算法</button>
+    </div>
+  </section>
+
+  <section class="board" aria-label="貓咪計分板">
+    <svg class="mascot" id="mascot" data-mood="idle" viewBox="0 0 120 104" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round" stroke-linecap="round">
+      <path d="M22 46 L20 8 L50 27 Z" fill="#ffe5bf"/><path d="M98 46 L100 8 L70 27 Z" fill="#ffe5bf"/>
+      <path d="M27 38 L26 19 L41 29 Z" fill="#ffc9d6" stroke="none"/><path d="M93 38 L94 19 L79 29 Z" fill="#ffc9d6" stroke="none"/>
+      <ellipse cx="60" cy="64" rx="46" ry="34" fill="#ffe5bf"/>
+      <path d="M52 33 v8 M60 31 v10 M68 33 v8" stroke="#e0a05a"/>
+      <ellipse cx="33" cy="75" rx="7" ry="4.5" fill="#ff9db5" opacity=".55" stroke="none"/><ellipse cx="87" cy="75" rx="7" ry="4.5" fill="#ff9db5" opacity=".55" stroke="none"/>
+      <path d="M56 68 h8 l-4 5 z" fill="#ff8aa6" stroke-width="2"/>
+      <path d="M24 70 l-14 -3 M24 77 l-14 4 M96 70 l14 -3 M96 77 l14 4" stroke-width="2"/>
+      <g class="m idle"><circle cx="42" cy="58" r="4.5" fill="currentColor" stroke="none"/><circle cx="78" cy="58" r="4.5" fill="currentColor" stroke="none"/><path d="M60 73 q-5 6 -11 3 M60 73 q5 6 11 3" stroke-width="2.6"/></g>
+      <g class="m happy"><path d="M35 61 q7 -10 14 0 M71 61 q7 -10 14 0" stroke-width="3.4"/><path d="M52 75 q8 13 16 0 z" fill="#ff8aa6" stroke-width="2.4"/></g>
+      <g class="m oops"><path d="M36 53 l12 6 M84 53 l-12 6" stroke-width="3.2"/><circle cx="44" cy="62" r="3" fill="currentColor" stroke="none"/><circle cx="76" cy="62" r="3" fill="currentColor" stroke="none"/><path d="M52 81 q8 -7 16 0" stroke-width="2.6"/></g>
+    </svg>
+    <div class="bubble" id="bubble" aria-live="polite"></div>
+    <dl class="stats">
+      <div class="stat"><dt>小魚乾</dt><dd><svg class="fish" viewBox="0 0 28 16" aria-hidden="true"><path d="M2 8 C6 1 15 1 20 8 C15 15 6 15 2 8 Z M20 8 L27 2 L27 14 Z" fill="#ff9a5c"/><circle cx="7" cy="7" r="1.2" fill="#2a2f3a"/></svg><span id="st-fish">0</span></dd></div>
+      <div class="stat"><dt>連勝</dt><dd id="st-streak">0</dd></div>
+      <div class="stat"><dt>已完成</dt><dd id="st-solved">0</dd></div>
+      <div class="stat"><dt>用時</dt><dd id="st-time">0:00</dd></div>
+      <div class="stat"><dt>等級</dt><dd><span id="st-level">小奶貓</span><span class="lvnote" id="st-note"></span></dd></div>
+    </dl>
+  </section>
+
+  <section class="table" id="table" aria-label="牌桌">
+    <span class="badge" id="badge">範例牌組</span>
+    <div class="deck-wrap">
+      <div class="deck" id="deck" aria-hidden="true"></div>
+      <div class="deck-count" id="left">牌堆剩 47 張</div>
+    </div>
+    <div class="stage">
+      <div class="target-tag">目標<b id="tag-target">120</b></div>
+      <div class="hand" id="hand"></div>
+      <div class="ops" id="ops" role="group" aria-label="運算符號與工具">
+        <button class="op" type="button" data-op="+" aria-label="加" aria-pressed="false">+</button>
+        <button class="op" type="button" data-op="−" aria-label="減" aria-pressed="false">−</button>
+        <button class="op" type="button" data-op="×" aria-label="乘" aria-pressed="false">×</button>
+        <button class="op" type="button" data-op="÷" aria-label="除" aria-pressed="false">÷</button>
+        <span class="sep" aria-hidden="true"></span>
+        <button class="tool" id="undo" type="button">復原</button>
+        <button class="tool" id="hint" type="button">提示</button>
+        <button class="tool" id="reset" type="button">重來</button>
+      </div>
+      <p class="status" id="status"></p>
+    </div>
+    <div class="confetti" id="confetti" aria-hidden="true"></div>
+  </section>
+
+  <section class="results" id="results" aria-live="polite"></section>
+</main>
+
+<script>
+(function(){
+'use strict';
+const $ = id => document.getElementById(id);
+const reduce = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+const SUITS = [
+  {s:'♠︎', red:false, name:'黑桃'},
+  {s:'♥︎', red:true,  name:'紅心'},
+  {s:'♦︎', red:true,  name:'方塊'},
+  {s:'♣︎', red:false, name:'梅花'}
+];
+const RANK = {1:'A', 11:'J', 12:'Q', 13:'K'};
+const rankLabel = r => RANK[r] || String(r);
+const CAT = '<svg viewBox="0 0 64 54" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round">'
+  + '<path d="M11 24 L12 4 L27 13 Z" style="fill:var(--cat)"/><path d="M53 24 L52 4 L37 13 Z" style="fill:var(--cat)"/>'
+  + '<ellipse cx="32" cy="32" rx="25" ry="19" style="fill:var(--cat)"/>'
+  + '<circle cx="23" cy="30" r="2.6" fill="currentColor" stroke="none"/><circle cx="41" cy="30" r="2.6" fill="currentColor" stroke="none"/>'
+  + '<ellipse cx="17" cy="37" rx="4" ry="2.4" fill="#ff9db5" opacity=".6" stroke="none"/><ellipse cx="47" cy="37" rx="4" ry="2.4" fill="#ff9db5" opacity=".6" stroke="none"/>'
+  + '<path d="M29.8 35.5 h4.4 l-2.2 2.8 z" fill="currentColor"/><path d="M32 38.5 q-2.6 3.6 -6 1.6 M32 38.5 q2.6 3.6 6 1.6" stroke-width="2"/>'
+  + '<path d="M13 36 l-8 -2 M13 40 l-8 3 M51 36 l8 -2 M51 40 l8 3" stroke-width="1.6"/></svg>';
+const PEEK = '<svg class="peeker" viewBox="0 0 72 38" aria-hidden="true" fill="none" stroke="#2a2f3a" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round" style="--cat:#ffe5bf">'
+  + '<path d="M10 22 L11 3 L27 12 Z" style="fill:var(--cat)"/><path d="M62 22 L61 3 L45 12 Z" style="fill:var(--cat)"/>'
+  + '<path d="M6 38 C6 16 20 9 36 9 C52 9 66 16 66 38 Z" style="fill:var(--cat)"/>'
+  + '<circle cx="26" cy="25" r="2.4" fill="#2a2f3a" stroke="none"/><circle cx="46" cy="25" r="2.4" fill="#2a2f3a" stroke="none"/>'
+  + '<path d="M33.5 28 h5 l-2.5 3 z" fill="#ff8aa6"/><path d="M36 31 q-3 3 -6 1.5 M36 31 q3 3 6 1.5" stroke-width="1.8"/>'
+  + '<ellipse cx="20" cy="36" rx="8" ry="4.6" style="fill:var(--cat)"/><ellipse cx="52" cy="36" rx="8" ry="4.6" style="fill:var(--cat)"/></svg>';
+const PAWSVG = '<svg viewBox="-9 -10 18 18" fill="#f06b8e" aria-hidden="true"><ellipse cx="0" cy="4" rx="5" ry="4.2"/><circle cx="-6" cy="-3" r="2.2"/><circle cx="-2.2" cy="-6.8" r="2.2"/><circle cx="2.2" cy="-6.8" r="2.2"/><circle cx="6" cy="-3" r="2.2"/></svg>';
+const FISHSVG = '<svg viewBox="0 0 28 16" aria-hidden="true"><path d="M2 8 C6 1 15 1 20 8 C15 15 6 15 2 8 Z M20 8 L27 2 L27 14 Z" fill="#ff9a5c"/><circle cx="7" cy="7" r="1.2" fill="#2a2f3a"/></svg>';
+const YARNS = ['#f7a8c0','#a8e0c8','#c9b8f0','#ffdca0'];
+
+/*SOLVER*/
+function gcd(a,b){a=Math.abs(a);b=Math.abs(b);while(b){const t=a%b;a=b;b=t}return a||1}
+function fr(n,d){if(d<0){n=-n;d=-d}const g=gcd(n,d);return {n:n/g,d:d/g}}
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));const t=a[i];a[i]=a[j];a[j]=t}return a}
+function leaf(n){return {leaf:true,num:n,v:{n:n,d:1}}}
+function mk(op,l,r){
+  const a=l.v,b=r.v;let v;
+  if(op==='+')v=fr(a.n*b.d+b.n*a.d,a.d*b.d);
+  else if(op==='−')v=fr(a.n*b.d-b.n*a.d,a.d*b.d);
+  else if(op==='×')v=fr(a.n*b.n,a.d*b.d);
+  else v=fr(a.n*b.d,a.d*b.n);
+  return {op:op,l:l,r:r,v:v};
+}
+function cmp(a,b){return a.n*b.d-b.n*a.d}
+function combos(x,y,allowFrac){
+  const out=[mk('+',x,y),mk('×',x,y)];
+  const c=cmp(x.v,y.v);
+  if(c>0)out.push(mk('−',x,y));else if(c<0)out.push(mk('−',y,x));
+  const tryDiv=function(a,b){
+    if(b.v.n===0)return;
+    if(b.v.n===1&&b.v.d===1)return;
+    const q=mk('÷',a,b);
+    if(!allowFrac&&q.v.d!==1)return;
+    out.push(q);
+  };
+  tryDiv(x,y);tryDiv(y,x);
+  return out;
+}
+function key(n){
+  if(n.leaf)return String(n.num);
+  if(n.op==='+'||n.op==='×'){
+    const parts=[];
+    (function col(m){if(!m.leaf&&m.op===n.op){col(m.l);col(m.r)}else parts.push(key(m))})(n);
+    parts.sort();
+    return n.op+'('+parts.join(',')+')';
+  }
+  const subs=[];let m=n;
+  while(!m.leaf&&m.op===n.op){subs.push(key(m.r));m=m.l}
+  subs.sort();
+  return n.op+'('+key(m)+';'+subs.join(',')+')';
+}
+const PREC={'+':1,'−':1,'×':2,'÷':2};
+function fmt(n){
+  if(n.leaf)return String(n.num);
+  const p=PREC[n.op];
+  const commut=(n.op==='+'||n.op==='×');
+  const wrapL=!n.l.leaf&&PREC[n.l.op]<p;
+  const wrapR=!n.r.leaf&&(commut?PREC[n.r.op]<p:PREC[n.r.op]<=p);
+  const L=fmt(n.l),R=fmt(n.r);
+  return (wrapL?'('+L+')':L)+' '+n.op+' '+(wrapR?'('+R+')':R);
+}
+function fv(v){return v.d===1?String(v.n):v.n+'/'+v.d}
+function steps(n,out){
+  out=out||[];
+  if(n.leaf)return out;
+  steps(n.l,out);steps(n.r,out);
+  out.push(fv(n.l.v)+' '+n.op+' '+fv(n.r.v)+' = '+fv(n.v));
+  return out;
+}
+function findFromNodes(nodes,target,want,limit){
+  const results=[];const seen=new Set();const T=fr(target,1);
+  const LIMIT=limit||300000;
+  for(const allowFrac of [false,true]){
+    if(results.length>=want)break;
+    const dead=new Set();let count=0;
+    const rec=function(list){
+      if(results.length>=want)return true;
+      if(++count>LIMIT)return false;
+      if(list.length===1){
+        const v=list[0].v;
+        if(v.n===T.n&&v.d===T.d){
+          const k=key(list[0]), f=fmt(list[0]);
+          if(!seen.has(k)&&!seen.has(f)){seen.add(k);seen.add(f);results.push(list[0])}
+          return true;
+        }
+        return false;
+      }
+      const sk=list.map(x=>x.v.n+'/'+x.v.d).sort().join('|');
+      if(dead.has(sk))return false;
+      let reached=false;
+      const pairs=[];
+      for(let i=0;i<list.length;i++)for(let j=i+1;j<list.length;j++)pairs.push([i,j]);
+      shuffle(pairs);
+      for(const pr of pairs){
+        const i=pr[0],j=pr[1];
+        const rest=list.filter((_,k)=>k!==i&&k!==j);
+        const cs=shuffle(combos(list[i],list[j],allowFrac));
+        for(const c of cs){
+          if(rec(rest.concat([c])))reached=true;
+          if(results.length>=want)return true;
+        }
+      }
+      if(!reached&&count<=LIMIT)dead.add(sk);
+      return reached;
+    };
+    rec(nodes);
+  }
+  return results;
+}
+function findSolutions(vals,target,want,limit){return findFromNodes(vals.map(leaf),target,want,limit)}
+function findStep(n,set){
+  if(!n||n.leaf||set.has(n))return null;
+  if(set.has(n.l)&&set.has(n.r))return n;
+  return findStep(n.l,set)||findStep(n.r,set);
+}
+/*END*/
+
+/* ---------- 狀態 ---------- */
+let hand=[], items=[], history=[], nextId=1;
+let selId=null, opSel=null, hintInfo=null;
+let busy=false, resultState='placeholder';
+let solvedThisHand=false, moves=0, hintsUsed=0, peeked=false;
+let startT=0, timerId=null;
+const SKEY='cat-poker-score-v1';
+const LEVELS=[[0,'小奶貓'],[5,'小花貓'],[15,'狸花貓'],[30,'虎斑貓'],[60,'貓咪大王']];
+function loadScore(){
+  try{
+    const s=JSON.parse(localStorage.getItem(SKEY)||'{}');
+    return {fish:Math.max(0,+s.fish||0),solved:Math.max(0,+s.solved||0),streak:0};
+  }catch(e){return {fish:0,solved:0,streak:0}}
+}
+function saveScore(){
+  try{localStorage.setItem(SKEY,JSON.stringify({fish:game.fish,solved:game.solved}))}catch(e){}
+}
+const game=loadScore();
+const handEl=$('hand'), deckEl=$('deck'), resultsEl=$('results');
+
+function readInt(id,min,max,def){
+  const el=$(id);
+  let v=parseInt(el.value,10);
+  if(isNaN(v))v=def;
+  v=Math.max(min,Math.min(max,v));
+  el.value=v;
+  return v;
+}
+const vd=v=>fv(v).replace('-','−');
+function levelInfo(f){
+  let i=0;
+  LEVELS.forEach(function(l,k){if(f>=l[0])i=k});
+  const next=LEVELS[i+1];
+  return {i:i,name:LEVELS[i][1],need:next?next[0]-f:0};
+}
+
+/* ---------- 貓咪與計分板 ---------- */
+function say(text,mood){
+  $('bubble').textContent=text;
+  const m=$('mascot');
+  m.dataset.mood=mood||'idle';
+  if(mood==='happy'&&!reduce){
+    m.animate([{transform:'translateY(0)'},{transform:'translateY(-14px) rotate(-6deg)'},{transform:'translateY(0)'},{transform:'translateY(-8px) rotate(5deg)'},{transform:'translateY(0)'}],{duration:700,easing:'ease-out'});
+  }
+}
+function updateScore(){
+  $('st-fish').textContent=game.fish;
+  $('st-streak').textContent=game.streak;
+  $('st-solved').textContent=game.solved;
+  const L=levelInfo(game.fish);
+  $('st-level').textContent=L.name;
+  $('st-note').textContent=L.need>0?'再 '+L.need+' 條小魚乾升級':'已是最高等級';
+}
+function tickTime(){
+  const s=startT?Math.floor((Date.now()-startT)/1000):0;
+  $('st-time').textContent=Math.floor(s/60)+':'+String(s%60).padStart(2,'0');
+}
+function startTimerOnce(){
+  if(startT)return;
+  startT=Date.now();
+  timerId=setInterval(tickTime,500);
+  tickTime();
+}
+function stopTimer(){if(timerId){clearInterval(timerId);timerId=null}}
+function resetTimer(){stopTimer();startT=0;tickTime()}
+
+function confetti(){
+  if(reduce)return;
+  const box=$('confetti');
+  const H=box.clientHeight||300;
+  for(let i=0;i<28;i++){
+    const el=document.createElement('span');
+    el.className='conf';
+    el.innerHTML=i%2?PAWSVG:FISHSVG;
+    el.style.left=(Math.random()*96)+'%';
+    box.appendChild(el);
+    const dx=(Math.random()-.5)*90, rot=(Math.random()-.5)*540;
+    const a=el.animate([
+      {transform:'translate(0px,-30px) rotate(0deg)',opacity:1},
+      {transform:'translate('+dx+'px,'+(H+40)+'px) rotate('+rot+'deg)',opacity:.9}
+    ],{duration:1500+Math.random()*1300,delay:Math.random()*450,easing:'cubic-bezier(.3,.1,.6,1)',fill:'backwards'});
+    a.finished.then(function(){el.remove()}).catch(function(){el.remove()});
+  }
+}
+
+/* ---------- 牌堆與動畫 ---------- */
+function buildDeck(){
+  deckEl.replaceChildren();
+  for(let i=0;i<6;i++){
+    const d=document.createElement('div');
+    d.className='layer';
+    d.style.transform='translate('+(-i*1.2)+'px,'+(-i*1.2)+'px)';
+    deckEl.appendChild(d);
+  }
+}
+function waitAll(list){return Promise.all(list.map(a=>a.finished.catch(function(){})))}
+function shuffleAnim(){
+  if(reduce)return Promise.resolve();
+  const layers=Array.prototype.slice.call(deckEl.children);
+  return waitAll(layers.map(function(el,i){
+    const base=el.style.transform;
+    const dir=i%2?1:-1;
+    return el.animate([
+      {transform:base},
+      {transform:base+' translateX('+(dir*36)+'px) rotate('+(dir*5)+'deg)',offset:.3},
+      {transform:base+' translateX('+(-dir*22)+'px) rotate('+(-dir*3)+'deg)',offset:.65},
+      {transform:base}
+    ],{duration:650,delay:i*25,easing:'ease-in-out'});
+  }));
+}
+function setLeft(n){$('left').textContent='牌堆剩 '+(52-n)+' 張'}
+function setBadge(on){$('badge').hidden=!on}
+
+/* ---------- 牌與毛線球 ---------- */
+function cardEl(c){
+  const slot=document.createElement('button');slot.type='button';slot.className='slot';
+  const card=document.createElement('div');card.className='card';
+  const su=SUITS[c.suit], lab=rankLabel(c.rank);
+  card.innerHTML='<div class="face front s'+c.suit+(su.red?' red':'')+'"><span class="corner tl"><b>'+lab+'</b><i>'+su.s+'</i></span><span class="pip">'+CAT+'<em>'+su.s+'</em></span><span class="corner br"><b>'+lab+'</b><i>'+su.s+'</i></span></div><div class="face back"></div>';
+  slot.setAttribute('aria-label',su.name+' '+lab+'，數值 '+c.rank);
+  const val=document.createElement('span');val.className='val';val.textContent=c.rank;
+  slot.appendChild(card);slot.appendChild(val);
+  return {slot:slot,card:card,val:val};
+}
+function yarnEl(item){
+  const slot=document.createElement('button');slot.type='button';slot.className='slot';
+  const y=document.createElement('div');y.className='yarn';
+  y.style.setProperty('--yarn',YARNS[item.id%4]);
+  const txt=vd(item.node.v);
+  y.innerHTML='<svg viewBox="0 0 64 64" fill="none" stroke="#2a2f3a" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><circle cx="32" cy="32" r="28" style="fill:var(--yarn)"/><path d="M10 24 Q32 42 54 22 M8 36 Q32 54 56 34 M16 12 Q36 30 52 50 M12 48 Q22 30 40 6" stroke="#fff" stroke-opacity=".85" stroke-width="2.2"/><path d="M52 50 q10 6 4 12 q-4 3 -8 1"/></svg><span class="ynum'+(txt.length>4?' small':'')+'">'+txt+'</span>';
+  const val=document.createElement('span');val.className='val cap';val.textContent=fmt(item.node);
+  slot.setAttribute('aria-label','毛線球 '+txt+'，算式 '+fmt(item.node));
+  slot.appendChild(y);slot.appendChild(val);
+  return {slot:slot,card:y,val:val};
+}
+function makePart(item){
+  const p=item.card?cardEl(item.card):yarnEl(item);
+  p.slot.dataset.id=item.id;
+  return p;
+}
+function buildBoard(opts){
+  opts=opts||{};
+  handEl.replaceChildren();
+  const parts=items.map(makePart);
+  parts.forEach(p=>handEl.appendChild(p.slot));
+  refreshSel();
+  const anims=[];
+  if(opts.fly&&!reduce){
+    const top=deckEl.lastElementChild.getBoundingClientRect();
+    parts.forEach(function(p,i){
+      const r=p.card.getBoundingClientRect();
+      const dx=(top.left+top.width/2)-(r.left+r.width/2);
+      const dy=(top.top+top.height/2)-(r.top+r.height/2);
+      anims.push(p.card.animate([
+        {transform:'perspective(900px) translate('+dx+'px,'+dy+'px) rotate(-6deg) rotateY(180deg)',offset:0},
+        {transform:'perspective(900px) translate('+(dx*.45)+'px,'+(dy*.45-30)+'px) rotate(-3deg) rotateY(110deg) scale(1.08)',offset:.55},
+        {transform:'perspective(900px) translate(0px,0px) rotate(0deg) rotateY(0deg) scale(1)',offset:1}
+      ],{duration:760,delay:i*180,easing:'cubic-bezier(.3,.7,.2,1)',fill:'backwards'}));
+      anims.push(p.val.animate([{opacity:0},{opacity:0,offset:.75},{opacity:1}],{duration:760,delay:i*180,fill:'backwards'}));
+    });
+  }
+  if(opts.popId&&!reduce){
+    const k=items.findIndex(i=>i.id===opts.popId);
+    if(k>=0){
+      anims.push(parts[k].card.animate([
+        {transform:'scale(.3) rotate(-30deg)',opacity:0},
+        {transform:'scale(1.15) rotate(6deg)',opacity:1,offset:.6},
+        {transform:'scale(1) rotate(0deg)',opacity:1}
+      ],{duration:420,easing:'ease-out'}));
+    }
+  }
+  return waitAll(anims);
+}
+function refreshSel(){
+  handEl.querySelectorAll('.slot').forEach(function(s){
+    const id=+s.dataset.id;
+    s.classList.toggle('sel',id===selId);
+    s.classList.toggle('hint',!!hintInfo&&(id===hintInfo.a||id===hintInfo.b));
+    s.setAttribute('aria-pressed',id===selId?'true':'false');
+  });
+  document.querySelectorAll('.op').forEach(function(b){
+    const on=b.dataset.op===opSel;
+    b.classList.toggle('on',on);
+    b.setAttribute('aria-pressed',on?'true':'false');
+  });
+  updateStatus();
+}
+function updateStatus(){
+  const el=$('status');
+  if(solvedThisHand){el.textContent='完成！按「發牌」再玩一手。';return}
+  if(items.length===1){el.textContent='只剩一個數字，按「復原」或「重來」再試試。';return}
+  const a=items.find(i=>i.id===selId);
+  if(!a)el.textContent='① 點一張牌或毛線球';
+  else if(!opSel)el.textContent=vd(a.node.v)+' ？　② 選運算符號';
+  else el.textContent=vd(a.node.v)+' '+opSel+' ？　③ 點另一張';
+}
+function updateOps(){
+  const off=busy||solvedThisHand;
+  document.querySelectorAll('.op').forEach(b=>{b.disabled=off||items.length<2});
+  $('undo').disabled=off||history.length===0;
+  $('hint').disabled=off||items.length<2;
+  $('reset').disabled=off||(history.length===0&&items.length===hand.length);
+  $('deal').disabled=busy;
+  $('solve').disabled=busy;
+}
+function setBusy(b){busy=b;updateOps()}
+
+/* ---------- 玩法 ---------- */
+function initItems(){
+  items=hand.map(function(c){return {id:nextId++,card:c,node:leaf(c.rank)}});
+}
+function initGame(){
+  initItems();
+  history=[];selId=null;opSel=null;hintInfo=null;
+  solvedThisHand=false;moves=0;hintsUsed=0;peeked=false;
+  resetTimer();
+  updateOps();
+}
+function pick(id){
+  if(busy||solvedThisHand)return;
+  const it=items.find(x=>x.id===id);
+  if(!it)return;
+  startTimerOnce();
+  hintInfo=null;
+  if(selId===null){selId=id}
+  else if(opSel===null){selId=(selId===id)?null:id}
+  else if(id!==selId){combine(selId,id,opSel);return}
+  else{selId=null;opSel=null}
+  refreshSel();
+}
+function chooseOp(op){
+  if(busy||solvedThisHand)return;
+  startTimerOnce();
+  hintInfo=null;
+  if(selId===null){say('先點一張牌，再選運算符號喔。','idle');refreshSel();return}
+  opSel=(opSel===op)?null:op;
+  refreshSel();
+}
+function combine(aId,bId,op){
+  const a=items.find(x=>x.id===aId), b=items.find(x=>x.id===bId);
+  if(!a||!b)return;
+  if(op==='÷'&&b.node.v.n===0){say('不能除以 0 喔！','oops');return}
+  history.push(items.slice());
+  moves++;
+  const node=mk(op,a.node,b.node);
+  const yarn={id:nextId++,node:node};
+  const ia=items.indexOf(a), ib=items.indexOf(b);
+  items=items.filter(x=>x!==a&&x!==b);
+  items.splice(Math.min(ia,ib),0,yarn);
+  selId=null;opSel=null;hintInfo=null;
+  buildBoard({popId:yarn.id});
+  updateOps();
+  say(vd(a.node.v)+' '+op+' '+vd(b.node.v)+' ＝ '+vd(node.v)+'，喵～','idle');
+  checkEnd();
+}
+function checkEnd(){
+  if(items.length!==1)return;
+  const target=readInt('target',1,9999,120);
+  const v=items[0].node.v;
+  if(v.n===target&&v.d===1)win();
+  else say('得到 '+vd(v)+'，不是 '+target+'。按「復原」再試試看！','oops');
+  updateStatus();
+}
+function win(){
+  solvedThisHand=true;
+  const secs=startT?Math.round((Date.now()-startT)/1000):0;
+  stopTimer();tickTime();
+  game.streak++;game.solved++;
+  const noHelp=(hintsUsed===0&&!peeked);
+  let gain=3+(noHelp?2:0)+(secs<=60?1:0)+Math.min(game.streak-1,3);
+  if(peeked)gain=1;
+  const before=levelInfo(game.fish).i;
+  game.fish+=gain;
+  saveScore();
+  const after=levelInfo(game.fish);
+  let msg=peeked?'湊出來了！偷看過答案，只拿到 1 條小魚乾。':'答對了！拿到 '+gain+' 條小魚乾。';
+  if(after.i>before)msg+='　升級了，你現在是「'+after.name+'」！';
+  say(msg,'happy');
+  confetti();
+  updateScore();updateOps();updateStatus();
+}
+function undo(){
+  if(busy||solvedThisHand||!history.length)return;
+  items=history.pop();
+  selId=null;opSel=null;hintInfo=null;
+  buildBoard();updateOps();
+  say('回到上一步。','idle');
+}
+function resetHand(){
+  if(busy||solvedThisHand)return;
+  initItems();
+  history=[];selId=null;opSel=null;hintInfo=null;
+  buildBoard();updateOps();
+  say('重新開始，加油！','idle');
+}
+function hint(){
+  if(busy||solvedThisHand||items.length<2)return;
+  startTimerOnce();
+  const target=readInt('target',1,9999,120);
+  hintsUsed++;
+  const sols=findFromNodes(items.map(i=>i.node),target,1);
+  if(!sols.length){
+    hintInfo=null;refreshSel();
+    say('從這個局面湊不出 '+target+'，按「復原」或「重來」試試。','oops');
+    return;
+  }
+  const step=findStep(sols[0],new Set(items.map(i=>i.node)));
+  const a=step&&items.find(i=>i.node===step.l), b=step&&items.find(i=>i.node===step.r);
+  if(!a||!b){hintInfo=null;refreshSel();say('先試試看把兩張牌合起來吧。','idle');return}
+  hintInfo={a:a.id,b:b.id,op:step.op};
+  refreshSel();
+  say('試試看：'+vd(step.l.v)+' '+step.op+' '+vd(step.r.v)+'（發光的兩張）。','idle');
+}
+
+/* ---------- 發牌 ---------- */
+function drawHand(n,target){
+  const guarantee=$('solvable').checked;
+  const t0=Date.now();
+  let h=null,ok=!guarantee;
+  for(let t=0;t<400;t++){
+    const deck=[];
+    for(let s=0;s<4;s++)for(let r=1;r<=13;r++)deck.push({rank:r,suit:s});
+    shuffle(deck);
+    h=deck.slice(0,n);
+    if(!guarantee)break;
+    if(findSolutions(h.map(c=>c.rank),target,1,12000).length){ok=true;break}
+    if(Date.now()-t0>1500)break;
+  }
+  return {hand:h,ok:ok};
+}
+async function deal(){
+  if(busy)return;
+  if(!solvedThisHand&&moves>0&&game.streak>0){
+    game.streak=0;saveScore();updateScore();
+  }
+  const n=readInt('n-cards',2,7,5);
+  const target=readInt('target',1,9999,120);
+  setBusy(true);
+  setBadge(false);
+  hint_clear();
+  showPlaceholder('發牌中…');
+  handEl.replaceChildren();
+  say('洗牌中…','idle');
+  await shuffleAnim();
+  const d=drawHand(n,target);
+  hand=d.hand;
+  initGame();
+  setBusy(true);
+  setLeft(n);
+  await buildBoard({fly:true});
+  showPlaceholder(placeholderText());
+  setBusy(false);
+  if(!d.ok)say('找不到保證有解的牌，這手可能無解，可以再發一手。','idle');
+  else say('湊出 '+target+' 就能拿小魚乾！先點一張牌吧。','idle');
+}
+function hint_clear(){hintInfo=null;selId=null;opSel=null}
+
+/* ---------- 算法清單 ---------- */
+function showPlaceholder(text){
+  resultState='placeholder';
+  resultsEl.replaceChildren();
+  const p=document.createElement('p');p.className='hint';
+  p.textContent=text;
+  resultsEl.appendChild(p);
+}
+function placeholderText(){
+  const t=readInt('target',1,9999,120), w=readInt('want',1,10,5);
+  return '想看答案？按下「找出算法」，這 '+hand.length+' 張牌會列出 '+w+' 組湊出 '+t+' 的算法。';
+}
+function exprHTML(s){return s.replace(/[+−×÷]/g,m=>'<span class="op-s">'+m+'</span>')}
+function renderResults(res,target,want,sample){
+  resultState='results';
+  resultsEl.replaceChildren();
+  const h=document.createElement('h2');
+  h.innerHTML=hand.length+' 張牌各用一次，湊出 '+target+(sample?' <span class="tag">範例</span>':'');
+  resultsEl.appendChild(h);
+  const note=document.createElement('p');note.className='hint';
+  if(res.length===0){
+    note.textContent='這手牌找不到湊出 '+target+' 的算法。可以再發一手牌，或換一個目標數字。';
+    resultsEl.appendChild(note);return;
+  }
+  if(res.length<want)note.textContent='這手牌只找到 '+res.length+' 組不同的算法。';
+  else note.textContent='再按一次「找出算法」會換一批不同的算法。';
+  const ol=document.createElement('ol');ol.className='solutions';
+  res.forEach(function(n,i){
+    const li=document.createElement('li');li.className='sol';
+    const idx='<span class="idx">第 '+(i+1)+' 組</span>';
+    const ex='<div class="expr">'+exprHTML(fmt(n))+' = '+target+'</div>';
+    const st='<div class="steps">'+steps(n).map(s=>'<span class="step">'+exprHTML(s)+'</span>').join('')+'</div>';
+    li.innerHTML=idx+ex+st;
+    ol.appendChild(li);
+  });
+  resultsEl.appendChild(ol);
+  resultsEl.appendChild(note);
+}
+function solveNow(){
+  if(busy)return;
+  const target=readInt('target',1,9999,120), want=readInt('want',1,10,5);
+  if(!solvedThisHand)peeked=true;
+  setBusy(true);
+  showPlaceholder('計算中…');
+  setTimeout(function(){
+    const res=findSolutions(hand.map(c=>c.rank),target,want);
+    renderResults(res,target,want,!$('badge').hidden);
+    setBusy(false);
+  },30);
+}
+
+/* ---------- 事件與初始畫面 ---------- */
+$('deal').addEventListener('click',deal);
+$('solve').addEventListener('click',solveNow);
+$('undo').addEventListener('click',undo);
+$('hint').addEventListener('click',hint);
+$('reset').addEventListener('click',resetHand);
+$('ops').addEventListener('click',function(e){
+  const b=e.target.closest('.op');
+  if(b&&!b.disabled)chooseOp(b.dataset.op);
+});
+handEl.addEventListener('click',function(e){
+  const s=e.target.closest('.slot');
+  if(s)pick(+s.dataset.id);
+});
+$('target').addEventListener('change',function(){
+  $('tag-target').textContent=readInt('target',1,9999,120);
+  if(!busy&&resultState==='placeholder')showPlaceholder(placeholderText());
+});
+$('want').addEventListener('change',function(){
+  if(!busy&&resultState==='placeholder')showPlaceholder(placeholderText());
+});
+
+/* 邊框的四隻角落貓，和牌桌上方探頭的貓 */
+(function(){
+  const c=$('corners');
+  [['tl','#dfe5f1','-10deg'],['tr','#ffd9e1','10deg'],['bl','#ffe5bf','8deg'],['br','#d9f0df','-8deg']].forEach(function(x){
+    const d=document.createElement('div');
+    d.className='cc cc-'+x[0];
+    d.style.setProperty('--cat',x[1]);
+    d.style.setProperty('--rot',x[2]);
+    d.innerHTML=CAT;
+    c.appendChild(d);
+  });
+  $('table').insertAdjacentHTML('beforeend',PEEK);
+})();
+
+/* 開頁時先放一手範例牌和它的算法，按「發牌」就會換成新的一手 */
+buildDeck();
+hand=[{rank:1,suit:0},{rank:4,suit:1},{rank:5,suit:2},{rank:10,suit:3},{rank:12,suit:0}];
+setLeft(hand.length);
+initGame();
+buildBoard();
+updateScore();
+say('點一張牌、選運算符號、再點另一張牌，湊出 120 就有小魚乾！','idle');
+renderResults(findSolutions(hand.map(c=>c.rank),120,5),120,5,true);
+})();
+</script>
+
+</body></html>
